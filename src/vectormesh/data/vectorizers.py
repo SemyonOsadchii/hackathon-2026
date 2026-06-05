@@ -44,6 +44,7 @@ class BaseVectorizer(ABC, Cachable):
     device: str = Field(default_factory=detect_device)
 
     _metadata: Any = PrivateAttr()
+    _effective_max_length: Optional[int] = PrivateAttr(default=None)
 
     @abstractmethod
     @model_validator(mode="after")
@@ -52,10 +53,8 @@ class BaseVectorizer(ABC, Cachable):
         Initialize the model/API connection.
         Must set self._metadata with at least:
         - hidden_size or dim: output dimension
-        - max_position_embeddings (optional): context window size
-
-        For API-based models, this might just set up API keys.
-        For local models, this loads the model weights.
+        Must set self._effective_max_length to the actual context limit used,
+        or None if the concept does not apply (e.g. RegexVectorizer).
         """
         pass
 
@@ -87,7 +86,7 @@ class BaseVectorizer(ABC, Cachable):
             "model_name": self.model_name,
             "col_name": self.col_name,
             "hidden_size": getattr(self._metadata, "hidden_size"),
-            "context_size": getattr(self._metadata, "max_position_embeddings"),
+            "context_size": self._effective_max_length,
         }
 
     @property
@@ -95,31 +94,36 @@ class BaseVectorizer(ABC, Cachable):
         return getattr(self._metadata, "hidden_size")
 
     @property
-    def get_context_size(self) -> int:
-        return getattr(self._metadata, "max_position_embeddings")
+    def get_context_size(self) -> Optional[int]:
+        return self._effective_max_length
 
 
 class Vectorizer(BaseVectorizer):
     model_name: str
     col_name: str
     device: str = Field(default_factory=detect_device)
+    max_length: Optional[int] = None
 
     _metadata: Any = PrivateAttr()
     _tokenizer: Any = PrivateAttr()
     _model: Any = PrivateAttr()
     _stride: int = PrivateAttr()
+    _effective_max_length: int = PrivateAttr()
     chunk_sizes: Counter = Counter()
 
     @model_validator(mode="after")
     def initialize_model(self):
         self._metadata = AutoConfig.from_pretrained(self.model_name)
-        max_pos = getattr(self._metadata, "max_position_embeddings")
         self._tokenizer = AutoTokenizer.from_pretrained(self.model_name)
         self._model = AutoModel.from_pretrained(self.model_name).to(self.device).eval()
-        self._stride = max_pos // 10
+
+        max_pos = getattr(self._metadata, "max_position_embeddings")
+        self._effective_max_length = min(max_pos, self.max_length) if self.max_length else max_pos
+        self._stride = self._effective_max_length // 10
+
         logger.info(f"Using device: {self.device}")
         logger.info(
-            f"using stride: {self._stride}, based on max_position_embeddings: {max_pos} // 10"
+            f"using max_length: {self._effective_max_length} (model max: {max_pos}), stride: {self._stride}"
         )
         return self
 
@@ -148,19 +152,10 @@ class Vectorizer(BaseVectorizer):
         We will later reconstruct into
         (chunks, max_length) for each document with the help of the overflow indices
         """
-        max_length = getattr(self._metadata, "max_position_embeddings")
-        if max_length is None:
-            raise VectorMeshError(
-                message=f"Model '{self.model_name}' does not have a max_position_embeddings attribute.",
-                hint="Check that the model ID is correct and supports sentence-transformers.",
-                fix=f"See: `BaseVectorizer(model_name='{self.model_name}`._metadata for max_poistion_embeddings",
-            )
-        pad_token_id = getattr(self._metadata, "pad_token_id", 1)
-        safe_max_length = max_length - (pad_token_id + 1)
         tokens = self._tokenizer(
             text,
             truncation=True,
-            max_length=safe_max_length,
+            max_length=self._effective_max_length,
             stride=self._stride,
             return_overflowing_tokens=True,
             return_tensors="pt",
@@ -295,13 +290,12 @@ class RegexVectorizer(BaseVectorizer):
         self._match_counts = None
         self._doc_frequencies = None
 
-        # Create metadata
         class RegexMetadata:
             def __init__(self, max_features: int):
                 self.hidden_size = max_features
-                self.max_position_embeddings = None  # Not applicable for regex
 
         self._metadata = RegexMetadata(self.max_features)
+        self._effective_max_length = None
 
         if self.training_texts is not None:
             self.fit(self.training_texts)
