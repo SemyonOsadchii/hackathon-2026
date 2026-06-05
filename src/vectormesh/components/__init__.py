@@ -4,6 +4,7 @@ from .aggregation import (
     AttentionAggregator,
     BaseAggregator,
     MeanAggregator,
+    MaskedMeanAggregator,
     RNNAggregator,
 )
 from .connectors import Concatenate2D, Stack2D
@@ -16,6 +17,7 @@ __all__ = [
     "AttentionAggregator",
     "BaseAggregator",
     "MeanAggregator",
+    "MaskedMeanAggregator",
     "RNNAggregator",
     "Concatenate2D",
     "Stack2D",

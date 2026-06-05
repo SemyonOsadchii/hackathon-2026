@@ -39,6 +39,22 @@ class MeanAggregator(BaseAggregator):
         return tensors.mean(dim=1)
 
 
+class MaskedMeanAggregator(BaseAggregator):
+    """Mean aggregator that ignores zero-padded chunks (from FixedPadding).
+    Detects padding by checking if all values in a chunk are zero.
+    """
+
+    @jaxtyped(typechecker=beartype)
+    def forward(
+        self, tensors: Float[Tensor, "batch _ dim"]
+    ) -> Float[Tensor, "batch dim"]:
+        mask = tensors.abs().sum(dim=-1) > 0  # (batch, chunks), False for padded
+        mask_f = mask.unsqueeze(-1).float()   # (batch, chunks, 1)
+        summed = (tensors * mask_f).sum(dim=1)
+        count = mask_f.sum(dim=1).clamp(min=1)
+        return summed / count
+
+
 class AttentionAggregator(BaseAggregator):
     """Aggregate using learnable attention over chunks.
     Because attention does not handle variable-length sequences,
