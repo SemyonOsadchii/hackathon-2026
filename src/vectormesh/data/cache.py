@@ -27,8 +27,8 @@ class VectorCache(Cachable, Generic[TVectorizer]):
         dataset: Dataset,
         dataset_tag: str = "default",
         features: Optional[Features] = None,
-        vector_batch: Optional[int] = 32,
-        map_batch: Optional[int] = 32,
+        vector_batch: int = 32,
+        map_batch: int = 32,
         column_name: Optional[str] = None,
     ) -> "VectorCache[TVectorizer]":
         """
