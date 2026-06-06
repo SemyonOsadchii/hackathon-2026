@@ -1,7 +1,7 @@
 """VectorMesh data components."""
 
 from .cache import VectorCache
-from .dataset import Collate, LabelEncoder, OneHot, build
+from .dataset import Collate, CollateParallel, LabelEncoder, OneHot, build
 from .vectorizers import BaseVectorizer, RegexVectorizer, Vectorizer
 
 __all__ = [
@@ -9,6 +9,7 @@ __all__ = [
     "LabelEncoder",
     "OneHot",
     "Collate",
+    "CollateParallel",
     "build",
     "BaseVectorizer",
     "Vectorizer",
