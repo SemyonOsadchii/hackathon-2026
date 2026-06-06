@@ -14,7 +14,7 @@ from pydantic import Field, PrivateAttr, model_validator
 from torch import Tensor
 from transformers import AutoConfig, AutoModel, AutoTokenizer
 
-from vectormesh.types import Cachable, VectorMeshError
+from vectormesh.types import Cachable
 
 
 def detect_device() -> str:
@@ -118,7 +118,9 @@ class Vectorizer(BaseVectorizer):
         self._model = AutoModel.from_pretrained(self.model_name).to(self.device).eval()
 
         max_pos = getattr(self._metadata, "max_position_embeddings")
-        self._effective_max_length = min(max_pos, self.max_length) if self.max_length else max_pos
+        self._effective_max_length = (
+            min(max_pos, self.max_length) if self.max_length else max_pos
+        )
         self._stride = self._effective_max_length // 10
 
         logger.info(f"Using device: {self.device}")
