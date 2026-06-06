@@ -79,60 +79,46 @@ class Highway(BaseComponent):
 
 
 class MoE(BaseComponent):
-    """
-    See https://arxiv.org/abs/1701.06538 for paper
+    """Dense mixture of experts: a softmax-weighted blend of all experts.
+
+    The natural "multi-gate" generalisation of the gating family in this module::
+
+        Gate:     sigmoid(Wx) * x                    # 1 gate,  1 transform
+        Highway:  g * T(x) + (1 - g) * x             # 1 gate,  2 experts (T, identity)
+        MoE:      sum_i softmax(Wx)_i * expert_i(x)  # N gates, N experts
+
+    This is essentially the original Jacobs & Jordan (Adaptive mixtures of local experts, 1991) formulation, not optimized for
+    thousands of experts like the Shazeer et al. (2017) paper.
+
+    Routing is per position, so the layer accepts both (batch, hidden) and
+    (batch, seq, hidden) inputs: the same softmax-blend is applied along the
+    last axis at every position.
+
+    Experts must map (..., hidden_size) to (..., out_size)
+
+    Args:
+        experts: modules mapping (..., hidden_size) -> (..., out_size).
+        hidden_size: input dimensionality (also the router input size).
+        out_size: output dimensionality of each expert.
     """
 
-    def __init__(self, experts, hidden_size, out_size, top_k, noisy_gating=True):
+    def __init__(
+        self, experts: list[nn.Module], hidden_size: int, out_size: int
+    ) -> None:
         super().__init__()
         self.experts = nn.ModuleList(experts)
         self.router = nn.Linear(hidden_size, len(experts))
-
-        self.w_noise = nn.Linear(hidden_size, len(experts))
-        self.noisy_gating = noisy_gating
-        self.top_k = top_k
-        self.num_experts = len(experts)
+        self.hidden_size = hidden_size
         self.out_size = out_size
+        self.num_experts = len(experts)
 
-    def forward(self, tensors):
-        clean_logits = self.router(tensors)
-
-        # self.training is automatically managed by .eval() and .train()
-        if self.noisy_gating and self.training:
-            raw_noise_stddev = self.w_noise(tensors)
-            noise_stddev = F.softplus(raw_noise_stddev) + 1e-2
-            noise = torch.randn_like(clean_logits) * noise_stddev
-            noisy_logits = clean_logits + noise
-        else:
-            noisy_logits = clean_logits
-
-        # We set non-top-k logits to -inf so Softmax drives them to absolute zero
-        top_logits, top_indices = noisy_logits.topk(self.top_k, dim=1)
-        full_logits = torch.full_like(noisy_logits, float("-inf"))
-        full_logits.scatter_(1, top_indices, top_logits)
-
-        router_probs = F.softmax(full_logits, dim=1)
-
-        final_output = torch.zeros(
-            tensors.size(0), self.out_size, device=tensors.device
-        )
-
-        for i in range(self.num_experts):
-            mask = (top_indices == i).any(dim=1)
-
-            if mask.any():
-                expert_input = tensors[mask]
-                expert_output = self.experts[i](expert_input)
-
-                expert_weights = router_probs[mask, i].unsqueeze(-1)
-
-                final_output[mask] += expert_output * expert_weights
-
-        # TODO: the paper implements importance loss
-        # to encourage balanced expert usage
-        #
-        # importance = router_probs.sum(dim=0)
-        # imp_loss = (importance.std() / (importance.mean() + 1e-10)).pow(2)
-        # return final_output, imp_loss
-
-        return final_output
+    @jaxtyped(typechecker=beartype)
+    def forward(
+        self, tensors: Float[Tensor, "... {self.hidden_size}"]
+    ) -> Float[Tensor, "... {self.out_size}"]:
+        # Per-position gates over experts; works for 2D and 3D alike.
+        gates = F.softmax(self.router(tensors), dim=-1)  # (..., num_experts)
+        # stack experts on dim -2: (..., num_experts, out_size)
+        expert_outputs = torch.stack([e(tensors) for e in self.experts], dim=-2)
+        # sum over experts weighted by gates: (..., out_size)
+        return (gates.unsqueeze(-1) * expert_outputs).sum(dim=-2)
