@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VectorMesh Hackathon Report</title>
+  <meta name="description" content="Student report for the VectorMesh legal document classification hackathon.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="VectorMesh hackathon report home">
+      <span class="brand-mark">VM</span>
+      <span>VectorMesh Hackathon</span>
+    </a>
+    <nav class="nav" aria-label="Page sections">
+      <a href="#data">Data</a>
+      <a href="#experiments">Trials</a>
+      <a href="#final">Final model</a>
+      <a href="#results">Results</a>
+      <a href="#reflection">Reflection</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero section">
+      <div class="hero-copy">
+        <h1>Legal fact classification, from baseline to a small targeted correction</h1>
+        <p>
+          This page summarizes my hackathon work on Dutch legal document classification.
+          The task was to predict multiple legal fact labels for each document, using the
+          provided VectorMesh notebooks and cached embeddings as the starting point.
+        </p>
+        <div class="hero-actions" aria-label="Main result">
+          <a class="button" href="#results">View final scores</a>
+          <a class="button secondary" href="#experiments">See what failed</a>
+        </div>
+      </div>
+
+      <div class="score-panel" aria-label="Final validation scores">
+        <div class="score-card main-score">
+          <span class="score-label">Final validation micro-F1</span>
+          <strong>0.8647</strong>
+          <span class="score-note">overall classification quality</span>
+        </div>
+        <div class="score-card main-score accent">
+          <span class="score-label">Final validation macro-F1</span>
+          <strong>0.6503</strong>
+          <span class="score-note">more sensitive to rare labels</span>
+        </div>
+        <div class="mini-grid">
+          <div>
+            <strong>32</strong>
+            <span>labels</span>
+          </div>
+          <div>
+            <strong>17,474</strong>
+            <span>documents used</span>
+          </div>
+          <div>
+            <strong>+0.0885</strong>
+            <span>macro-F1 vs plain attention</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section compact" aria-label="Short summary">
+      <div class="summary-strip">
+        <p>
+          My final approach was not just a bigger model. The useful improvement came from
+          paying attention to the metric, handling rare labels more carefully, and adding a
+          small legal phrase router only where the error analysis showed a clear legal pattern.
+        </p>
+      </div>
+    </section>
+
+    <section id="data" class="section two-column">
+      <div>
+        <h2>The task I worked on</h2>
+        <p>
+          Each legal document can have more than one correct label, so I treated the problem
+          as multi-label classification. Some labels are common, while others are rare. This
+          made the task more interesting than a normal single-class prediction problem.
+        </p>
+        <p>
+          I used micro-F1 as the general quality check, but I focused more on macro-F1 during
+          the later experiments. Micro-F1 can look good even when rare labels are ignored.
+          Macro-F1 made those weak labels visible.
+        </p>
+      </div>
+
+      <div class="table-card">
+        <h3>Data split</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Split</th>
+              <th>Documents</th>
+              <th>Role</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Training core</td>
+              <td>12,426</td>
+              <td>fit the neural models</td>
+            </tr>
+            <tr>
+              <td>Calibration</td>
+              <td>3,106</td>
+              <td>choose thresholds and small corrections</td>
+            </tr>
+            <tr>
+              <td>Official validation</td>
+              <td>1,942</td>
+              <td>report final F1 scores</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-heading">
+        <h2>Final pipeline</h2>
+        <p>
+          The final system stayed fairly simple. The neural part predicts label probabilities,
+          thresholds are selected per label, and a small phrase router adjusts only a few
+          closely related legal labels.
+        </p>
+      </div>
+
+      <div class="pipeline" aria-label="Pipeline diagram">
+        <div class="pipe-step">
+          <span class="pipe-number">1</span>
+          <h3>Document chunks</h3>
+          <p>Use cached legal Dutch embeddings for each document chunk.</p>
+        </div>
+        <div class="pipe-arrow" aria-hidden="true">&rarr;</div>
+        <div class="pipe-step">
+          <span class="pipe-number">2</span>
+          <h3>Attention model</h3>
+          <p>Learn which chunks matter more for predicting legal facts.</p>
+        </div>
+        <div class="pipe-arrow" aria-hidden="true">&rarr;</div>
+        <div class="pipe-step">
+          <span class="pipe-number">3</span>
+          <h3>Per-label thresholds</h3>
+          <p>Use calibration data so rare labels do not all share one global cutoff.</p>
+        </div>
+        <div class="pipe-arrow" aria-hidden="true">&rarr;</div>
+        <div class="pipe-step">
+          <span class="pipe-number">4</span>
+          <h3>Phrase router</h3>
+          <p>Adjust labels 28, 29, and 31 when the legal wording gives a clear signal.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="experiments" class="section">
+      <div class="section-heading">
+        <h2>Experiment trail</h2>
+        <p>
+          I kept the failed attempts in the story because they explain why the final method
+          ended up being more targeted than expected.
+        </p>
+      </div>
+
+      <div class="timeline">
+        <article class="timeline-item">
+          <span class="timeline-index">01</span>
+          <div>
+            <h3>Masked mean baseline</h3>
+            <p>
+              I started with a simple model that averages chunk embeddings and predicts the
+              labels with a small neural network. It was stable and already had decent
+              micro-F1, but macro-F1 showed that rare labels were weak.
+            </p>
+            <dl>
+              <div><dt>micro-F1</dt><dd>0.8489</dd></div>
+              <div><dt>macro-F1</dt><dd>0.4093</dd></div>
+            </dl>
+          </div>
+        </article>
+
+        <article class="timeline-item">
+          <span class="timeline-index">02</span>
+          <div>
+            <h3>Attention model</h3>
+            <p>
+              Attention helped because important legal facts often appear in specific parts of
+              the document. This became the strongest standard neural model.
+            </p>
+            <dl>
+              <div><dt>micro-F1</dt><dd>0.8544</dd></div>
+              <div><dt>macro-F1</dt><dd>0.5618</dd></div>
+            </dl>
+          </div>
+        </article>
+
+        <article class="timeline-item muted">
+          <span class="timeline-index">03</span>
+          <div>
+            <h3>Mixture of experts</h3>
+            <p>
+              I expected different experts to learn different legal patterns. In practice, it
+              was worse than attention. This was a useful negative result: more complexity did
+              not automatically improve the task.
+            </p>
+            <dl>
+              <div><dt>micro-F1</dt><dd>0.8246</dd></div>
+              <div><dt>macro-F1</dt><dd>0.3932</dd></div>
+            </dl>
+          </div>
+        </article>
+
+        <article class="timeline-item muted">
+          <span class="timeline-index">04</span>
+          <div>
+            <h3>LegalEvidenceReranker</h3>
+            <p>
+              I tried a two-stage idea where model probabilities became evidence for a small
+              reranker. The idea was reasonable, but the reranker mostly repeated the same
+              errors as the first-stage models.
+            </p>
+            <dl>
+              <div><dt>micro-F1</dt><dd>0.8518</dd></div>
+              <div><dt>macro-F1</dt><dd>0.4120</dd></div>
+            </dl>
+          </div>
+        </article>
+
+        <article class="timeline-item muted">
+          <span class="timeline-index">05</span>
+          <div>
+            <h3>Label graph correction</h3>
+            <p>
+              I estimated label co-occurrence patterns from the training data. It gave a small
+              micro-F1 lift, but macro-F1 dropped, so the correction was too general for rare
+              labels.
+            </p>
+            <dl>
+              <div><dt>micro-F1</dt><dd>0.8556</dd></div>
+              <div><dt>macro-F1</dt><dd>0.5360</dd></div>
+            </dl>
+          </div>
+        </article>
+
+        <article class="timeline-item highlight">
+          <span class="timeline-index">06</span>
+          <div>
+            <h3>Macro-focused attention</h3>
+            <p>
+              The main breakthrough came from changing the training objective and thresholds
+              so rare labels mattered more. Positive class weighting and per-label thresholds
+              improved macro-F1 without damaging micro-F1.
+            </p>
+            <dl>
+              <div><dt>micro-F1</dt><dd>0.8588</dd></div>
+              <div><dt>macro-F1</dt><dd>0.6304</dd></div>
+            </dl>
+          </div>
+        </article>
+
+        <article class="timeline-item highlight">
+          <span class="timeline-index">07</span>
+          <div>
+            <h3>Rare legal phrase router</h3>
+            <p>
+              The final step corrected a specific confusion around labels that all mention
+              <em>art. 7:3 BW</em>. It used phrases like <em>WVG</em>, <em>voorkeursrecht</em>,
+              <em>Omgevingswet</em>, and <em>9.9</em> as small legal signals.
+            </p>
+            <dl>
+              <div><dt>micro-F1</dt><dd>0.8647</dd></div>
+              <div><dt>macro-F1</dt><dd>0.6503</dd></div>
+            </dl>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="final" class="section two-column final-section">
+      <div>
+        <h2>What became the final idea</h2>
+        <p>
+          I first thought the creative part would be a larger model or a reranker. The results
+          pushed me in a different direction. The final idea was smaller but more connected to
+          the task: use attention for the general model, then correct a narrow legal confusion
+          pattern that the neural model struggled with.
+        </p>
+        <p>
+          The router did not try to fix every rare label. In fact, calibration rejected the
+          phrase boost for labels 23 and 26, so I did not include it as a final improvement.
+          That made the solution less flashy, but more honest.
+        </p>
+      </div>
+
+      <div class="router-card">
+        <h3>Targeted router behaviour</h3>
+        <div class="router-rule">
+          <span>WVG or voorkeursrecht</span>
+          <strong>boost label 28</strong>
+        </div>
+        <div class="router-rule">
+          <span>Omgevingswet or 9.9</span>
+          <strong>boost label 31</strong>
+        </div>
+        <div class="router-rule">
+          <span>art. 7:3 without subtype</span>
+          <strong>small boost label 29</strong>
+        </div>
+        <p>
+          The selected correction was modest: a boost of 0.25 and a suppression of 0.15 for
+          conflicting labels.
+        </p>
+      </div>
+    </section>
+
+    <section id="results" class="section">
+      <div class="section-heading">
+        <h2>Validation results</h2>
+        <p>
+          The table below shows the main stages. The largest useful jump was from plain
+          attention to macro-focused attention, followed by a smaller targeted router gain.
+        </p>
+      </div>
+
+      <div class="results-layout">
+        <div class="chart-card" aria-label="Macro-F1 chart">
+          <h3>Macro-F1 progression</h3>
+          <div class="bar-row">
+            <span>Masked mean</span>
+            <div class="bar-track"><div class="bar" style="width: 62.9%"></div></div>
+            <strong>0.4093</strong>
+          </div>
+          <div class="bar-row">
+            <span>Attention</span>
+            <div class="bar-track"><div class="bar" style="width: 86.4%"></div></div>
+            <strong>0.5618</strong>
+          </div>
+          <div class="bar-row weak">
+            <span>Reranker</span>
+            <div class="bar-track"><div class="bar" style="width: 63.4%"></div></div>
+            <strong>0.4120</strong>
+          </div>
+          <div class="bar-row">
+            <span>Label graph</span>
+            <div class="bar-track"><div class="bar" style="width: 82.4%"></div></div>
+            <strong>0.5360</strong>
+          </div>
+          <div class="bar-row good">
+            <span>Macro attention</span>
+            <div class="bar-track"><div class="bar" style="width: 96.9%"></div></div>
+            <strong>0.6304</strong>
+          </div>
+          <div class="bar-row best">
+            <span>Final router</span>
+            <div class="bar-track"><div class="bar" style="width: 100%"></div></div>
+            <strong>0.6503</strong>
+          </div>
+        </div>
+
+        <div class="table-card">
+          <h3>Main comparison</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Stage</th>
+                <th>Micro-F1</th>
+                <th>Macro-F1</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Masked mean baseline</td>
+                <td>0.8489</td>
+                <td>0.4093</td>
+              </tr>
+              <tr>
+                <td>Best attention model</td>
+                <td>0.8544</td>
+                <td>0.5618</td>
+              </tr>
+              <tr>
+                <td>LegalEvidenceReranker</td>
+                <td>0.8518</td>
+                <td>0.4120</td>
+              </tr>
+              <tr>
+                <td>Label graph corrector</td>
+                <td>0.8556</td>
+                <td>0.5360</td>
+              </tr>
+              <tr>
+                <td>Macro-focused attention</td>
+                <td>0.8588</td>
+                <td>0.6304</td>
+              </tr>
+              <tr class="final-row">
+                <td>Final phrase router</td>
+                <td>0.8647</td>
+                <td>0.6503</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-heading">
+        <h2>What the error analysis showed</h2>
+        <p>
+          Average F1 scores were useful, but the per-label table explained where the model was
+          actually struggling.
+        </p>
+      </div>
+
+      <div class="insight-grid">
+        <article class="insight-card">
+          <h3>Labels 23 and 26 stayed unresolved</h3>
+          <p>
+            These labels still had zero F1. I considered keyword features, but calibration did
+            not support boosting them. The phrases were not clean enough and could easily add
+            false positives.
+          </p>
+        </article>
+        <article class="insight-card">
+          <h3>Labels 28, 29, and 31 had a clearer pattern</h3>
+          <p>
+            These labels all relate to <em>art. 7:3 BW</em>, but differ in extra legal context.
+            That made them a better target for a small rule-based correction.
+          </p>
+        </article>
+        <article class="insight-card">
+          <h3>The router improved the labels it targeted</h3>
+          <p>
+            Label 28 improved from 0.500 to 0.857 F1, label 31 from 0.417 to 0.842 F1,
+            and label 29 improved slightly from 0.578 to 0.622 F1.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section id="reflection" class="section reflection">
+      <div>
+        <h2>Reflection</h2>
+        <p>
+          The main lesson was that the best improvement did not come from simply adding a more
+          complicated model. MoE sounded more advanced, but performed worse. The reranker was a
+          reasonable idea, but did not add enough independent information. The useful progress
+          came from looking at the metric, understanding the imbalance, and matching the method
+          to the actual errors.
+        </p>
+        <p>
+          I would not claim the final solution is perfect. Labels 23 and 26 remain weak, and a
+          separate final test set would be a stronger way to estimate generalization after all
+          design decisions are frozen. Still, the final result improved both micro-F1 and
+          macro-F1, and the final correction is connected to a concrete legal pattern rather
+          than only to random tuning.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>
+      Student hackathon report for the VectorMesh legal document classification assignment.
+      Built as a static GitHub Pages page.
+    </p>
+  </footer>
+</body>
+</html>
