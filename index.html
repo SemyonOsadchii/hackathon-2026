@@ -6,6 +6,7 @@
   <title>VectorMesh Hackathon Report</title>
   <meta name="description" content="Student report for the VectorMesh legal document classification hackathon.">
   <link rel="stylesheet" href="styles.css">
+  <script src="script.js" defer></script>
 </head>
 <body>
   <header class="site-header">
@@ -181,6 +182,7 @@
               <div><dt>micro-F1</dt><dd>0.8489</dd></div>
               <div><dt>macro-F1</dt><dd>0.4093</dd></div>
             </dl>
+            <button type="button" class="detail-button" data-detail="masked-mean">More detail</button>
           </div>
         </article>
 
@@ -196,6 +198,7 @@
               <div><dt>micro-F1</dt><dd>0.8544</dd></div>
               <div><dt>macro-F1</dt><dd>0.5618</dd></div>
             </dl>
+            <button type="button" class="detail-button" data-detail="attention">More detail</button>
           </div>
         </article>
 
@@ -212,6 +215,7 @@
               <div><dt>micro-F1</dt><dd>0.8246</dd></div>
               <div><dt>macro-F1</dt><dd>0.3932</dd></div>
             </dl>
+            <button type="button" class="detail-button" data-detail="moe">More detail</button>
           </div>
         </article>
 
@@ -228,6 +232,7 @@
               <div><dt>micro-F1</dt><dd>0.8518</dd></div>
               <div><dt>macro-F1</dt><dd>0.4120</dd></div>
             </dl>
+            <button type="button" class="detail-button" data-detail="reranker">More detail</button>
           </div>
         </article>
 
@@ -244,6 +249,7 @@
               <div><dt>micro-F1</dt><dd>0.8556</dd></div>
               <div><dt>macro-F1</dt><dd>0.5360</dd></div>
             </dl>
+            <button type="button" class="detail-button" data-detail="label-graph">More detail</button>
           </div>
         </article>
 
@@ -260,6 +266,7 @@
               <div><dt>micro-F1</dt><dd>0.8588</dd></div>
               <div><dt>macro-F1</dt><dd>0.6304</dd></div>
             </dl>
+            <button type="button" class="detail-button" data-detail="macro-attention">More detail</button>
           </div>
         </article>
 
@@ -276,6 +283,7 @@
               <div><dt>micro-F1</dt><dd>0.8647</dd></div>
               <div><dt>macro-F1</dt><dd>0.6503</dd></div>
             </dl>
+            <button type="button" class="detail-button" data-detail="phrase-router">More detail</button>
           </div>
         </article>
       </div>
@@ -426,6 +434,7 @@
             not support boosting them. The phrases were not clean enough and could easily add
             false positives.
           </p>
+          <button type="button" class="detail-button" data-detail="unresolved-labels">More detail</button>
         </article>
         <article class="insight-card">
           <h3>Labels 28, 29, and 31 had a clearer pattern</h3>
@@ -433,6 +442,7 @@
             These labels all relate to <em>art. 7:3 BW</em>, but differ in extra legal context.
             That made them a better target for a small rule-based correction.
           </p>
+          <button type="button" class="detail-button" data-detail="clearer-pattern">More detail</button>
         </article>
         <article class="insight-card">
           <h3>The router improved the labels it targeted</h3>
@@ -440,6 +450,7 @@
             Label 28 improved from 0.500 to 0.857 F1, label 31 from 0.417 to 0.842 F1,
             and label 29 improved slightly from 0.578 to 0.622 F1.
           </p>
+          <button type="button" class="detail-button" data-detail="router-impact">More detail</button>
         </article>
       </div>
     </section>
@@ -464,6 +475,17 @@
       </div>
     </section>
   </main>
+
+  <dialog class="detail-dialog" id="detail-dialog" aria-labelledby="detail-title">
+    <div class="dialog-panel">
+      <div class="dialog-header">
+        <p class="dialog-kicker" id="detail-kicker"></p>
+        <button type="button" class="close-button" data-close-dialog>Close</button>
+      </div>
+      <h2 id="detail-title"></h2>
+      <div class="dialog-body" id="detail-body"></div>
+    </div>
+  </dialog>
 
   <footer class="footer">
     <p>
