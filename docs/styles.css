@@ -169,6 +169,35 @@ p {
   transform: translateY(-1px);
 }
 
+.detail-button,
+.close-button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.detail-button {
+  margin-top: 18px;
+  padding: 8px 13px;
+}
+
+.detail-button:hover,
+.detail-button:focus-visible,
+.close-button:hover,
+.close-button:focus-visible {
+  background: var(--ink);
+  color: white;
+  outline: none;
+}
+
 .score-panel {
   display: grid;
   gap: 16px;
@@ -541,6 +570,84 @@ dd {
   font-size: 0.92rem;
 }
 
+.detail-dialog {
+  box-sizing: border-box;
+  width: min(760px, calc(100% - 32px));
+  max-height: min(760px, calc(100vh - 40px));
+  margin: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+}
+
+.detail-dialog::backdrop {
+  background: rgba(32, 37, 34, 0.46);
+  backdrop-filter: blur(3px);
+}
+
+.dialog-panel {
+  max-height: min(760px, calc(100vh - 40px));
+  overflow: auto;
+  padding: clamp(24px, 4vw, 38px);
+  border: 1px solid var(--line);
+  border-top: 6px solid var(--green);
+  background: var(--paper);
+  box-shadow: 0 28px 80px rgba(32, 37, 34, 0.24);
+}
+
+.dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.dialog-kicker {
+  margin: 0;
+  color: var(--rust);
+  font-size: 0.8rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.close-button {
+  flex: 0 0 auto;
+  padding: 7px 12px;
+}
+
+.dialog-panel h2 {
+  max-width: 620px;
+  margin-bottom: 22px;
+  font-size: clamp(1.8rem, 4vw, 2.7rem);
+}
+
+.dialog-body {
+  display: grid;
+  gap: 18px;
+}
+
+.dialog-section {
+  padding-top: 18px;
+  border-top: 1px solid var(--soft);
+}
+
+.dialog-section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.dialog-section h3 {
+  margin-bottom: 8px;
+  color: var(--ink);
+}
+
+.dialog-section p {
+  margin-bottom: 0;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 920px) {
   .site-header {
     align-items: flex-start;
@@ -593,6 +700,10 @@ dd {
     width: 100%;
   }
 
+  .detail-button {
+    width: 100%;
+  }
+
   .mini-grid,
   .pipeline,
   .timeline-item,
@@ -634,5 +745,32 @@ dd {
   td:nth-child(n + 2),
   th:nth-child(n + 2) {
     padding-left: 10px;
+  }
+
+  .dialog-header {
+    flex-direction: column;
+  }
+
+  .detail-dialog {
+    width: 330px;
+    max-width: calc(100vw - 48px);
+  }
+
+  .dialog-panel {
+    padding: 22px;
+  }
+
+  .dialog-panel h2 {
+    font-size: 1.55rem;
+    line-height: 1.12;
+  }
+
+  .dialog-section h3 {
+    font-size: 1rem;
+    overflow-wrap: anywhere;
+  }
+
+  .close-button {
+    width: 100%;
   }
 }
